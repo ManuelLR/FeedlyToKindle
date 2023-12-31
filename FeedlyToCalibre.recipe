@@ -1,0 +1,98 @@
+#!/usr/bin/env python
+# vim:fileencoding=utf-8
+# License: GNU GPL v3 (http://www.gnu.org/licenses/gpl.html)
+
+from calibre.web.feeds.news import BasicNewsRecipe
+import requests
+from collections import defaultdict
+import tempfile
+import datetime
+import os
+import getpass
+
+
+
+class FeedlyToCalibre(BasicNewsRecipe):
+    title          = os.getenv("FTK_TITLE", "My Feedly News")
+    __author__     = os.getenv("FTK_AUTHOR", getpass.getuser())
+    oldest_article = 7
+    max_articles_per_feed = 100
+
+    ## Start: Testing config
+    auto_cleanup = False
+    language = 'es'
+    timefmt = ' [%Y.%m.%d]'
+    remove_empty_feeds = True
+    publication_type = 'newspaper'
+    ## End: Testing config
+
+    # Custom variables
+    FEEDLY_API_TOKEN = os.getenv("FTK_FEEDLY_API_TOKEN")
+    FEEDLY_STREAM_ID = os.getenv("FTK_FEEDLY_STREAM_ID")
+
+    if FEEDLY_API_TOKEN == None:
+        raise Exception("FTK_FEEDLY_API_TOKEN is not set")
+    if FEEDLY_STREAM_ID == None:
+        raise Exception("FTK_FEEDLY_STREAM_ID is not set")
+
+    available_articles_per_feed = defaultdict(list)
+
+
+    def parse_index(self):
+        headers = {'Authorization': 'Bearer ' + self.FEEDLY_API_TOKEN}
+        response = requests.get('https://api.feedly.com/v3/streams/contents', headers=headers, params={
+            'streamId': self.FEEDLY_STREAM_ID,
+            'count': 100,
+            'unreadOnly': True,
+            'ranked': 'newest',
+            'similar': False
+        })
+        response.raise_for_status()
+
+        for item in response.json()['items']:
+            pub_date = datetime.datetime.fromtimestamp(item['published']/1000)
+
+            url = item['alternate'][0]['href']
+            content = item.get('content', None)
+            content_path = tempfile.NamedTemporaryFile(suffix='.html', delete=False)
+            if content != None:
+                content_path.write(content.get('content', '').encode('utf-8'))
+                url = f"file://{content_path.name}"
+            else:
+                url = 'http://avoid_download'
+
+            description = None
+            if description == None and 'abstract' in item.keys():
+                description = item['abstract'].get('text', None)
+            if description == None and 'summary' in item.keys():
+                description = item['summary'].get('content', None)
+            
+            self.available_articles_per_feed[item['origin']['title']].append({
+                'id': item['id'],
+                'title': item['title'],
+                'url': url,
+                'date': pub_date.strftime("%Y/%m/%d %H:%M"),
+                'timestamp': pub_date.timestamp(),
+                'author': item.get('author', None),
+                'description': description,
+                'content': content
+            })
+        
+        self.log.debug(self.available_articles_per_feed.items())
+        result = list(self.available_articles_per_feed.items())
+
+        return result
+
+    def parse_feeds(self):
+        feeds = BasicNewsRecipe.parse_feeds(self)
+
+        # Avoid remove empty articles
+        # for feed in feeds:
+        #     for article in feed.articles[:]:
+        #         if article.content is None or len(article.content) < 500:
+        #             feed.articles.remove(article)
+
+        return feeds
+
+    # def sort_index_by(self, index, weights):
+    #     pass
