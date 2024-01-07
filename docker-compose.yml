@@ -3,7 +3,7 @@ services:
   converter:
     build: .
     ports:
-      - "${ServerIP}:8181:8080/tcp"
+      - "${FTK_SERVER_PORT}:${FTK_SERVER_PORT}/tcp"
     volumes:
       # Config files
       - generated-news:/output
