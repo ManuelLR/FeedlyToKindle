@@ -21,7 +21,7 @@ class FeedlyToCalibre(BasicNewsRecipe):
     ## Start: Testing config
     auto_cleanup = False
     language = 'es'
-    timefmt = ' [%Y.%m.%d]'
+    timefmt = ' [%Y.%m.%d %H:%M]'
     remove_empty_feeds = True
     publication_type = 'newspaper'
     ## End: Testing config

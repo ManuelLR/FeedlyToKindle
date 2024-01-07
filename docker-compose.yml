@@ -2,18 +2,14 @@ version: "2.4"
 services:
   converter:
     build: .
+    ports:
+      - "${ServerIP}:8181:8080/tcp"
     volumes:
       # Config files
       - generated-news:/output
     restart: unless-stopped
     env_file:
       - .env
-  nginx:
-    image: nginx:1.24-alpine-slim
-    ports:
-      - "${ServerIP}:80:80/tcp"
-    volumes:
-      - generated-news:/usr/share/nginx/html:ro
-    restart: unless-stopped
+
 volumes:
   generated-news:
